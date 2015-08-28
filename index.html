@@ -11,7 +11,11 @@
     <script>
         var n = 50;
         var m = 50;
-
+        //size of map for random generator
+        
+        var timeUnit = 86400000;
+        //one in-game "year"; for right now, let's make it a day of RL (real life) time
+        
         var map = [];
         for(var i = 0; i < n; i++)
             map[i] = [];
@@ -19,10 +23,12 @@
         for(var i = 0; i < n; i++)
             for(var j = 0; j < m; j++)
                 map[i][j] = Math.floor(Math.random()*4);
+        //generates random map
 
         console.log(map);
 
         var terrCol = ["lime","tan","blue","darkGreen"];
+        var terrType = ["Mountain", "Desert", "Water", "Plains"];
         
         for(var i = 0; i < n; i++){
             document.write("<tr>");
@@ -33,6 +39,102 @@
             document.write("</tr>");
         }
         
+        /**
+        ** In the finished game, the server will first update every single city, and then move armies, and then
+        ** move armies, and then render battles. It would probably be best to run this update once per second,
+        ** as any queue will be displayed to the player in seconds. 
+        **/
+        var updateGame = function()
+        {
+            for (var row = 0; row < map.length; row++)
+            {
+                for (var col = 0; col < map[row].length; col++)
+                {
+                    updateCity(row, col);
+                }
+            }
+        }
+        
+        var updateCity = function(x, y)
+        {
+            //x and y coordinates of the city, to be used later
+            //All of the following variables will be stored in the city database
+            var workingPop;
+                var secondarySectorJobs;
+                var tertiarySectorJobs;
+                //all of these will be stored as integers
+            var food;
+            var fuel;
+            var material;
+            var cash;
+            //i've decided that cash should be a resource that can be assigned to various things
+            var workersAssigned = [];
+            //workers assigned to each of the surrounding grid squares
+            var buildingLevels = []; //array of integers with the level of each building in the city
+            
+            loadVariablesFromServer(x,y);
+            
+            var primarySectorJobs;
+            for (var i = 0; i < workersAssigned.length; i++)
+            {
+                primarySectorJobs += workersAssigned[i];
+            }
+            
+            //somewhere here we need to make it so that the number of jobs does not exceed population
+            
+            var surroundingSquares = []; //north, northeast, east, southeast, south, southwest, west, northwest
+            loadGridFromServer(x,y);
+            
+            //these next few variables will be calculated based on what is stored on the server
+            var resourceEfficiency = 40;
+            //calculated based on tech, energy, tertiary sector jobs
+            var popGrowthModifier = 1;
+            //calculated based on health infrastructure, immigration policies (?)
+            var economyGrowthModifier = 1;
+            //calculated based on education infrastructure, fiscal policies (?), government type (?) 
+            
+            for (var i = 0; i < surroundingSquares.length; i++)
+            {
+                switch surroundingSquares[i]
+                {
+                    case 0:
+                        material += workersAssigned[i]*resourceEfficiency/timeUnit;
+                        //if the city has the building "coal mine" built also add energy
+                        break;
+                    case 1:
+                        energy += workersAssigned[i]*resourceEfficiency/timeUnit;
+                        //if the city has the building "pasture" built also add food
+                        break;
+                    case 2:
+                        food += workersAssigned[i]*resourceEfficiency/timeUnit;
+                        //if the city has the building "offshore drill" built also add energy
+                    case 3:
+                        food += workersAssigned[i]*resourceEfficiency/timeUnit;
+                        //if the city has the building "quarry" built also add material
+                        break;
+                }
+            }
+            
+            /*
+            ** Population is supposed to grow logistically, with food as the carrying capacity.
+            ** Similar rules for the economic sectors (other than primary, which the player assigns).
+            ** Let me know if I got the log growth function wrong, I haven't taken calc in awhile.
+            ** Fun fact, I derived it from a function discovered in 1920 by Lowell Reed of JHU.
+            */
+            
+            workingPop *= popGrowthModifier*(1-(workingPop/food));
+            var unemployment = (primarySectorJobs + secondarySectorJobs + tertiarySectorJobs) < workingPop;
+            if (unemployment)
+            {
+                secondarySectorJobs *= economyGrowthModifier*(1-(secondarySectorJobs/energy));
+                var nonProduction = workingPop - (primarySectorJobs + secondarySectorJobs);
+                tertiarySectorJobs *= economyGrowthModifier*(1-(tertiarySectorJobs/nonProduction));
+            }
+            
+            //and then again we have to readjust it so there are no more jobs than people
+            
+            //here we run through all the building tasks in the queue
+        }
         
         //name,population,resources(4),coords,sectors(3)(numJobs),buildingLevels
     </script>
